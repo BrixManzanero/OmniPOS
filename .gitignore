@@ -1,0 +1,23 @@
+# Python
+backend/.venv/
+backend/.env
+backend/omnipos.db
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
