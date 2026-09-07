@@ -8,15 +8,31 @@ import {
   getInventory,
   getInventoryMovements,
   restockProduct,
-} from "@/services/api";
+} from "../api/inventoryApi";
 
 import type {
   InventoryMovement,
-} from "@/services/api";
+} from "../types/inventory.types";
 
 import type {
   Product,
 } from "@/types/product";
+
+
+async function fetchInventoryData() {
+  const [
+    products,
+    movements,
+  ] = await Promise.all([
+    getInventory(),
+    getInventoryMovements(),
+  ]);
+
+  return {
+    products,
+    movements,
+  };
+}
 
 
 export function useInventory() {
@@ -36,64 +52,56 @@ export function useInventory() {
     useState(false);
 
 
-  async function loadInventory() {
-    try {
-      setLoading(true);
-      setError("");
-
-      const [
-        inventoryData,
-        movementData,
-      ] = await Promise.all([
-        getInventory(),
-        getInventoryMovements(),
-      ]);
-
-      setProducts(inventoryData);
-      setMovements(movementData);
-
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      }
-
-    } finally {
-      setLoading(false);
-    }
-  }
-
-
   useEffect(() => {
     let cancelled = false;
 
-    async function initializeInventory() {
-      try {
-        const [inventoryData, movementData] = await Promise.all([
-          getInventory(),
-          getInventoryMovements(),
-        ]);
 
-        if (!cancelled) {
-          setProducts(inventoryData);
-          setMovements(movementData);
+    fetchInventoryData()
+      .then((data) => {
+        if (cancelled) {
+          return;
         }
-      } catch (error) {
-        if (!cancelled && error instanceof Error) {
+
+        setProducts(data.products);
+        setMovements(data.movements);
+      })
+      .catch((error) => {
+        if (
+          !cancelled &&
+          error instanceof Error
+        ) {
           setError(error.message);
         }
-      } finally {
+      })
+      .finally(() => {
         if (!cancelled) {
           setLoading(false);
         }
-      }
-    }
+      });
 
-    void initializeInventory();
 
     return () => {
       cancelled = true;
     };
   }, []);
+
+
+  async function refreshInventory() {
+    try {
+      const data =
+        await fetchInventoryData();
+
+      setProducts(data.products);
+      setMovements(data.movements);
+      setError("");
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message);
+      }
+
+      throw error;
+    }
+  }
 
 
   async function handleRestock(
@@ -109,47 +117,52 @@ export function useInventory() {
         quantity,
       });
 
-      await loadInventory();
-
+      await refreshInventory();
     } catch (error) {
       if (error instanceof Error) {
         setError(error.message);
       }
 
       throw error;
-
     } finally {
       setRestocking(false);
     }
   }
 
 
-  const totalStock = useMemo(() => {
-    return products.reduce(
-      (total, product) =>
-        total + product.stock,
-      0
+  const totalStock =
+    useMemo(
+      () =>
+        products.reduce(
+          (total, product) =>
+            total + product.stock,
+          0
+        ),
+      [products]
     );
-  }, [products]);
 
 
   const lowStockProducts =
-    useMemo(() => {
-      return products.filter(
-        (product) =>
-          product.stock > 0 &&
-          product.stock <= 5
-      );
-    }, [products]);
+    useMemo(
+      () =>
+        products.filter(
+          (product) =>
+            product.stock > 0 &&
+            product.stock <= 5
+        ),
+      [products]
+    );
 
 
   const outOfStockProducts =
-    useMemo(() => {
-      return products.filter(
-        (product) =>
-          product.stock === 0
-      );
-    }, [products]);
+    useMemo(
+      () =>
+        products.filter(
+          (product) =>
+            product.stock === 0
+        ),
+      [products]
+    );
 
 
   return {
@@ -165,7 +178,6 @@ export function useInventory() {
     outOfStockProducts,
 
     handleRestock,
-    refreshInventory:
-      loadInventory,
+    refreshInventory,
   };
 }

@@ -6,13 +6,27 @@ import {
 
 import {
   checkoutOrder,
-  getCustomers,
-  getProducts,
-  type Customer,
-  type PaymentMethod,
-} from "@/services/api";
+} from "../orders/api/ordersApi";
 
-import type { Product } from "@/types/product";
+import type {
+  PaymentMethod,
+} from "../orders/types/order.types";
+
+import {
+  getProducts,
+} from "../products/api/productsApi";
+
+import {
+  getCustomers,
+} from "../customers/api/customersApi";
+
+import type {
+  Customer,
+} from "../customers/types/customer.types";
+
+import type {
+  Product,
+} from "@/types/product";
 
 
 type CartItem = {
@@ -190,6 +204,7 @@ function addToCart(
     ];
   });
 }
+
 
   /* =========================
      INCREASE QUANTITY

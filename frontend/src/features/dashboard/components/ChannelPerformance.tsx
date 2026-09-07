@@ -1,6 +1,6 @@
 import type {
   DashboardSummary,
-} from "@/services/api";
+} from "../types/dashboard.types";
 
 import {
   formatPeso,

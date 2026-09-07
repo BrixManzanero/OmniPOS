@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 
-import type { AnalyticsOverview } from "@/services/api";
+import type { AnalyticsOverview } from "../types/analytics.types";
 import { formatPeso } from "@/utils/formatters";
 
 import {

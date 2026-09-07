@@ -5,19 +5,19 @@ import {
 
 import type {
   Customer,
-} from "@/services/api";
-
-import CustomersSummary
-  from "./components/CustomersSummary";
-
-import CustomersTable
-  from "./components/CustomersTable";
+} from "./types/customer.types";
 
 import AddCustomerModal
   from "./components/AddCustomerModal";
 
 import CustomerDetailsModal
   from "./components/CustomerDetailsModal";
+
+import CustomersSummary
+  from "./components/CustomersSummary";
+
+import CustomersTable
+  from "./components/CustomersTable";
 
 import {
   useCustomers,
@@ -43,25 +43,35 @@ function CustomersPage() {
   const [
     selectedCustomer,
     setSelectedCustomer,
-  ] = useState<Customer | null>(null);
+  ] = useState<Customer | null>(
+    null
+  );
 
 
   const withPhone =
-    useMemo(() => {
-      return customers.filter(
-        (customer) =>
-          Boolean(customer.phone)
-      ).length;
-    }, [customers]);
+    useMemo(
+      () =>
+        customers.filter(
+          (customer) =>
+            Boolean(
+              customer.phone
+            )
+        ).length,
+      [customers]
+    );
 
 
   const withEmail =
-    useMemo(() => {
-      return customers.filter(
-        (customer) =>
-          Boolean(customer.email)
-      ).length;
-    }, [customers]);
+    useMemo(
+      () =>
+        customers.filter(
+          (customer) =>
+            Boolean(
+              customer.email
+            )
+        ).length,
+      [customers]
+    );
 
 
   if (loading) {
@@ -77,15 +87,12 @@ function CustomersPage() {
 
   return (
     <div className="page-section">
-
       {/* =========================
           PAGE HEADER
       ========================= */}
 
       <div className="page-header">
-
         <div>
-
           <p className="page-eyebrow">
             Customer Management
           </p>
@@ -99,7 +106,6 @@ function CustomersPage() {
             purchase history, and
             retention activity.
           </p>
-
         </div>
 
 
@@ -112,7 +118,6 @@ function CustomersPage() {
         >
           Add Customer
         </button>
-
       </div>
 
 
@@ -149,11 +154,8 @@ function CustomersPage() {
       ========================= */}
 
       <div className="section-card">
-
         <div className="section-card-header">
-
           <div>
-
             <h2>
               Customer Directory
             </h2>
@@ -162,9 +164,7 @@ function CustomersPage() {
               Registered customers
               in OmniPOS.
             </p>
-
           </div>
-
         </div>
 
 
@@ -176,7 +176,6 @@ function CustomersPage() {
             setSelectedCustomer
           }
         />
-
       </div>
 
 
@@ -212,7 +211,6 @@ function CustomersPage() {
           setSelectedCustomer(null)
         }
       />
-
     </div>
   );
 }

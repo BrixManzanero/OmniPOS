@@ -1,8 +1,13 @@
-import { useState } from "react";
+import {
+  useState,
+} from "react";
 
 import type {
   Product,
 } from "@/types/product";
+
+import InventoryMovements
+  from "./components/InventoryMovements";
 
 import InventorySummary
   from "./components/InventorySummary";
@@ -10,15 +15,11 @@ import InventorySummary
 import InventoryTable
   from "./components/InventoryTable";
 
-import InventoryMovements
-  from "./components/InventoryMovements";
+import ProductHistoryModal
+  from "./components/ProductHistoryModal";
 
 import RestockModal
   from "./components/RestockModal";
-
-import ProductHistoryModal
-  from "./components/ProductHistoryModal";
-  
 
 import {
   useInventory,
@@ -46,7 +47,6 @@ function InventoryPage() {
     null
   );
 
-
   const [
     historyProduct,
     setHistoryProduct,
@@ -68,11 +68,8 @@ function InventoryPage() {
 
   return (
     <div className="page-section">
-
       <div className="page-header">
-
         <div>
-
           <p className="page-eyebrow">
             Stock Management
           </p>
@@ -83,12 +80,10 @@ function InventoryPage() {
 
           <p className="page-description">
             Monitor product stock,
-            transactions, and
-            restocking history.
+            transactions, and restocking
+            history.
           </p>
-
         </div>
-
       </div>
 
 
@@ -116,27 +111,22 @@ function InventoryPage() {
 
 
       <div className="section-card">
-
         <div className="section-card-header">
-
           <div>
             <h2>
               Product Inventory
             </h2>
 
             <p>
-              Current stock levels
-              for all active products.
+              Current stock levels for
+              all active products.
             </p>
           </div>
-
         </div>
 
 
         <InventoryTable
-          products={
-            products
-          }
+          products={products}
           onRestock={
             setSelectedProduct
           }
@@ -144,24 +134,17 @@ function InventoryPage() {
             setHistoryProduct
           }
         />
-
       </div>
 
 
       <InventoryMovements
-        movements={
-          movements
-        }
+        movements={movements}
       />
 
 
       <RestockModal
-        product={
-          selectedProduct
-        }
-        restocking={
-          restocking
-        }
+        product={selectedProduct}
+        restocking={restocking}
         onClose={() =>
           setSelectedProduct(null)
         }
@@ -172,17 +155,12 @@ function InventoryPage() {
 
 
       <ProductHistoryModal
-        product={
-          historyProduct
-        }
-        movements={
-          movements
-        }
+        product={historyProduct}
+        movements={movements}
         onClose={() =>
           setHistoryProduct(null)
         }
       />
-
     </div>
   );
 }

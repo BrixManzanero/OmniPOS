@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { Order } from "@/services/api";
+import type { Order } from "./types/order.types";
 
 import OrderCard from "./components/OrderCard";
 import OrderDetailsModal from "./components/OrderDetailsModal";

@@ -4,7 +4,7 @@ import {
 
 import type {
   AnalyticsPeriod,
-} from "@/services/api";
+} from "./types/analytics.types";
 
 import AnalyticsFilters
   from "./components/AnalyticsFilters";

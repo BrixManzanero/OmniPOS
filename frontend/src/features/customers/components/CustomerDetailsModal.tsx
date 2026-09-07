@@ -3,14 +3,14 @@ import {
   useState,
 } from "react";
 
+import {
+  getCustomerHistory,
+} from "../api/customersApi";
+
 import type {
   Customer,
   CustomerHistory,
-} from "@/services/api";
-
-import {
-  getCustomerHistory,
-} from "@/services/api";
+} from "../types/customer.types";
 
 import {
   formatPeso,
@@ -23,6 +23,25 @@ type Props = {
 };
 
 
+function formatPurchaseDate(
+  value: string | null
+) {
+  if (!value) {
+    return "No purchases yet";
+  }
+
+  return new Date(
+    value
+  ).toLocaleString(
+    "en-PH",
+    {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }
+  );
+}
+
+
 function CustomerDetailsModal({
   customer,
   onClose,
@@ -30,73 +49,59 @@ function CustomerDetailsModal({
   const [
     history,
     setHistory,
-  ] = useState<CustomerHistory | null>(null);
-
-
-  const [
-    loading,
-    setLoading,
-  ] = useState(false);
-
+  ] = useState<CustomerHistory | null>(
+    null
+  );
 
   const [
     error,
     setError,
-  ] = useState<string | null>(null);
+  ] = useState<string | null>(
+    null
+  );
 
+
+  /* =========================
+     LOAD CUSTOMER HISTORY
+  ========================= */
 
   useEffect(() => {
     if (!customer) {
       return;
     }
 
-
     let cancelled = false;
 
 
-    async function loadHistory() {
-      setLoading(true);
-      setError(null);
-      setHistory(null);
-
-
-      try {
-        const data =
-          await getCustomerHistory(
-            customer!.id
-          );
-
-
-        if (!cancelled) {
-          setHistory(data);
+    getCustomerHistory(
+      customer.id
+    )
+      .then((data) => {
+        if (cancelled) {
+          return;
         }
 
-      } catch (err) {
-        if (!cancelled) {
-          if (err instanceof Error) {
-            setError(err.message);
-          } else {
-            setError(
-              "Failed to load customer history."
-            );
-          }
+        setHistory(data);
+        setError(null);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
         }
 
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
+        setHistory(null);
 
-
-    loadHistory();
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load customer history."
+        );
+      });
 
 
     return () => {
       cancelled = true;
     };
-
   }, [customer]);
 
 
@@ -105,37 +110,21 @@ function CustomerDetailsModal({
   }
 
 
-  const formatPurchaseDate = (
-    value: string | null
-  ) => {
-    if (!value) {
-      return "No purchases yet";
-    }
-
-
-    return new Date(
-      value
-    ).toLocaleString(
-      "en-PH",
-      {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }
-    );
-  };
+  const loading =
+    history?.customer.id !==
+      customer.id &&
+    error === null;
 
 
   return (
     <div className="modal-backdrop">
-
       <div className="payment-modal order-modal">
-
-        {/* HEADER */}
+        {/* =========================
+            HEADER
+        ========================= */}
 
         <div className="payment-modal-header">
-
           <div>
-
             <p className="page-eyebrow">
               Customer Profile
             </p>
@@ -143,7 +132,6 @@ function CustomerDetailsModal({
             <h2>
               {customer.name}
             </h2>
-
           </div>
 
 
@@ -154,14 +142,14 @@ function CustomerDetailsModal({
           >
             ×
           </button>
-
         </div>
 
 
-        {/* CONTACT INFORMATION */}
+        {/* =========================
+            CONTACT INFORMATION
+        ========================= */}
 
         <div className="order-detail-meta">
-
           <div>
             <span>
               Phone
@@ -193,28 +181,30 @@ function CustomerDetailsModal({
               #{customer.id}
             </strong>
           </div>
-
         </div>
 
 
-        {/* LOADING */}
+        {/* =========================
+            LOADING
+        ========================= */}
 
         {loading && (
           <div className="empty-state">
-
             <strong>
               Loading customer history...
             </strong>
 
             <span>
-              Retrieving purchase information.
+              Retrieving purchase
+              information.
             </span>
-
           </div>
         )}
 
 
-        {/* ERROR */}
+        {/* =========================
+            ERROR
+        ========================= */}
 
         {!loading && error && (
           <p className="error-message">
@@ -223,22 +213,25 @@ function CustomerDetailsModal({
         )}
 
 
-        {/* HISTORY */}
+        {/* =========================
+            CUSTOMER HISTORY
+        ========================= */}
 
         {!loading &&
           !error &&
           history && (
             <>
-
               <div className="order-detail-meta">
-
                 <div>
                   <span>
                     Total Orders
                   </span>
 
                   <strong>
-                    {history.summary.total_orders}
+                    {
+                      history.summary
+                        .total_orders
+                    }
                   </strong>
                 </div>
 
@@ -250,7 +243,8 @@ function CustomerDetailsModal({
 
                   <strong>
                     {formatPeso(
-                      history.summary.total_spent
+                      history.summary
+                        .total_spent
                     )}
                   </strong>
                 </div>
@@ -279,7 +273,8 @@ function CustomerDetailsModal({
                     {history.summary
                       .returning_customer
                       ? "Returning Customer"
-                      : history.summary.total_orders > 0
+                      : history.summary
+                            .total_orders > 0
                         ? "New Customer"
                         : "No Purchases Yet"}
                   </strong>
@@ -292,7 +287,10 @@ function CustomerDetailsModal({
                   </span>
 
                   <strong>
-                    {history.summary.pos_orders}
+                    {
+                      history.summary
+                        .pos_orders
+                    }
                   </strong>
                 </div>
 
@@ -303,7 +301,10 @@ function CustomerDetailsModal({
                   </span>
 
                   <strong>
-                    {history.summary.online_orders}
+                    {
+                      history.summary
+                        .online_orders
+                    }
                   </strong>
                 </div>
 
@@ -315,7 +316,8 @@ function CustomerDetailsModal({
 
                   <strong>
                     {formatPurchaseDate(
-                      history.summary.first_purchase
+                      history.summary
+                        .first_purchase
                     )}
                   </strong>
                 </div>
@@ -328,20 +330,20 @@ function CustomerDetailsModal({
 
                   <strong>
                     {formatPurchaseDate(
-                      history.summary.last_purchase
+                      history.summary
+                        .last_purchase
                     )}
                   </strong>
                 </div>
-
               </div>
 
 
-              {/* PURCHASE HISTORY */}
+              {/* =========================
+                  PURCHASE HISTORY
+              ========================= */}
 
               <div className="section-card-header">
-
                 <div>
-
                   <p className="page-eyebrow">
                     Purchase History
                   </p>
@@ -349,15 +351,13 @@ function CustomerDetailsModal({
                   <h3>
                     Transactions
                   </h3>
-
                 </div>
-
               </div>
 
 
-              {history.orders.length === 0 ? (
+              {history.orders.length ===
+              0 ? (
                 <div className="empty-state">
-
                   <strong>
                     No purchases yet
                   </strong>
@@ -366,11 +366,9 @@ function CustomerDetailsModal({
                     This customer has no
                     completed transactions.
                   </span>
-
                 </div>
               ) : (
                 <div className="order-detail-items">
-
                   {history.orders.map(
                     (order) => {
                       const orderDate =
@@ -379,8 +377,10 @@ function CustomerDetailsModal({
                         ).toLocaleString(
                           "en-PH",
                           {
-                            dateStyle: "medium",
-                            timeStyle: "short",
+                            dateStyle:
+                              "medium",
+                            timeStyle:
+                              "short",
                           }
                         );
 
@@ -390,27 +390,26 @@ function CustomerDetailsModal({
                           key={order.id}
                           className="order-detail-item"
                         >
-
                           <div>
-
                             <strong>
-                              Order #{order.id}
+                              Order #
+                              {order.id}
                             </strong>
 
 
                             <span>
-                              {order.order_channel}
+                              {
+                                order.order_channel
+                              }
 
                               {" • "}
 
-                              {order.payment_method
-                                .toUpperCase()}
+                              {order.payment_method.toUpperCase()}
 
                               {" • "}
 
                               {orderDate}
                             </span>
-
                           </div>
 
 
@@ -419,15 +418,12 @@ function CustomerDetailsModal({
                               order.total_amount
                             )}
                           </strong>
-
                         </div>
                       );
                     }
                   )}
-
                 </div>
               )}
-
             </>
           )}
 
@@ -439,9 +435,7 @@ function CustomerDetailsModal({
         >
           Close
         </button>
-
       </div>
-
     </div>
   );
 }

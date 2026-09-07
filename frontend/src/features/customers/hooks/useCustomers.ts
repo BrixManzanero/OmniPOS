@@ -6,77 +6,103 @@ import {
 import {
   createCustomer,
   getCustomers,
-} from "@/services/api";
+} from "../api/customersApi";
 
 import type {
   Customer,
   CustomerCreate,
-} from "@/services/api";
+} from "../types/customer.types";
 
 
 export function useCustomers() {
-  const [customers, setCustomers] =
-    useState<Customer[]>([]);
+  const [
+    customers,
+    setCustomers,
+  ] = useState<Customer[]>([]);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
 
-  const [creating, setCreating] =
-    useState(false);
+  const [
+    creating,
+    setCreating,
+  ] = useState(false);
 
-  const [error, setError] =
-    useState("");
+  const [
+    error,
+    setError,
+  ] = useState("");
 
 
-  async function loadCustomers() {
-    try {
-      setLoading(true);
-      setError("");
-
-      const data =
-        await getCustomers();
-
-      setCustomers(data);
-
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
-      }
-
-    } finally {
-      setLoading(false);
-    }
-  }
-
+  /* =========================
+     INITIAL LOAD
+  ========================= */
 
   useEffect(() => {
     let cancelled = false;
 
-    async function initializeCustomers() {
-      try {
-        const data = await getCustomers();
 
-        if (!cancelled) {
-          setCustomers(data);
+    getCustomers()
+      .then((data) => {
+        if (cancelled) {
+          return;
         }
-      } catch (error) {
-        if (!cancelled && error instanceof Error) {
-          setError(error.message);
+
+        setCustomers(data);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
         }
-      } finally {
+
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load customers."
+        );
+      })
+      .finally(() => {
         if (!cancelled) {
           setLoading(false);
         }
-      }
-    }
+      });
 
-    void initializeCustomers();
 
     return () => {
       cancelled = true;
     };
   }, []);
 
+
+  /* =========================
+     REFRESH CUSTOMERS
+  ========================= */
+
+  async function refreshCustomers() {
+    try {
+      const data =
+        await getCustomers();
+
+      setCustomers(data);
+      setError("");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to load customers.";
+
+      setError(message);
+
+      throw error;
+    }
+  }
+
+
+  /* =========================
+     CREATE CUSTOMER
+  ========================= */
 
   async function handleCreateCustomer(
     customer: CustomerCreate
@@ -85,17 +111,19 @@ export function useCustomers() {
       setCreating(true);
       setError("");
 
-      await createCustomer(customer);
+      await createCustomer(
+        customer
+      );
 
-      await loadCustomers();
-
+      await refreshCustomers();
     } catch (error) {
       if (error instanceof Error) {
-        setError(error.message);
+        setError(
+          error.message
+        );
       }
 
       throw error;
-
     } finally {
       setCreating(false);
     }
@@ -107,7 +135,8 @@ export function useCustomers() {
     loading,
     creating,
     error,
+
     handleCreateCustomer,
-    refreshCustomers: loadCustomers,
+    refreshCustomers,
   };
 }

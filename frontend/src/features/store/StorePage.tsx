@@ -4,20 +4,29 @@ import {
   useState,
 } from "react";
 
-import type {
-  Product,
-} from "@/types/product";
-
 import {
   checkoutOrder,
-  getCustomers,
+} from "../orders/api/ordersApi";
+
+import type {
+  PaymentMethod,
+} from "../orders/types/order.types";
+
+import {
   getProducts,
-} from "@/services/api";
+} from "../products/api/productsApi";
+
+import {
+  getCustomers,
+} from "../customers/api/customersApi";
 
 import type {
   Customer,
-  PaymentMethod,
-} from "@/services/api";
+} from "../customers/types/customer.types";
+
+import type {
+  Product,
+} from "@/types/product";
 
 import {
   formatPeso,
@@ -30,151 +39,123 @@ type CartItem = {
 };
 
 
-function StorePage() {
+async function fetchStoreData() {
+  const [
+    productData,
+    customerData,
+  ] = await Promise.all([
+    getProducts(),
+    getCustomers(),
+  ]);
 
+  return {
+    products:
+      productData.filter(
+        (product) =>
+          product.is_active
+      ),
+
+    customers:
+      customerData.filter(
+        (customer) =>
+          customer.is_active
+      ),
+  };
+}
+
+
+function StorePage() {
   const [
     products,
     setProducts,
   ] = useState<Product[]>([]);
-
 
   const [
     customers,
     setCustomers,
   ] = useState<Customer[]>([]);
 
-
   const [
     cart,
     setCart,
-  ] = useState<Record<number, number>>({});
-
+  ] = useState<Record<number, number>>(
+    {}
+  );
 
   const [
     loading,
     setLoading,
   ] = useState(true);
 
-
   const [
     error,
     setError,
-  ] = useState<string | null>(null);
-
+  ] = useState<string | null>(
+    null
+  );
 
   const [
     showCart,
     setShowCart,
   ] = useState(false);
 
-
   const [
     checkingOut,
     setCheckingOut,
   ] = useState(false);
 
-
   const [
     checkoutError,
     setCheckoutError,
-  ] = useState<string | null>(null);
-
+  ] = useState<string | null>(
+    null
+  );
 
   const [
     successMessage,
     setSuccessMessage,
-  ] = useState<string | null>(null);
-
+  ] = useState<string | null>(
+    null
+  );
 
   const [
     selectedCustomerId,
     setSelectedCustomerId,
-  ] = useState<number | null>(null);
-
+  ] = useState<number | null>(
+    null
+  );
 
   const [
     paymentMethod,
     setPaymentMethod,
-  ] = useState<PaymentMethod>("gcash");
+  ] = useState<PaymentMethod>(
+    "gcash"
+  );
 
 
   /* =========================
-     LOAD STORE DATA
+     INITIAL STORE LOAD
   ========================= */
-
-  async function loadStoreData() {
-
-    setLoading(true);
-    setError(null);
-
-    try {
-
-      const [
-        productData,
-        customerData,
-      ] = await Promise.all([
-        getProducts(),
-        getCustomers(),
-      ]);
-
-
-      setProducts(
-        productData.filter(
-          (product) =>
-            product.is_active
-        )
-      );
-
-
-      setCustomers(
-        customerData.filter(
-          (customer) =>
-            customer.is_active
-        )
-      );
-
-    } catch (err) {
-
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError(
-          "Failed to load the online store."
-        );
-      }
-
-    } finally {
-      setLoading(false);
-    }
-  }
-
 
   useEffect(() => {
     let cancelled = false;
 
-    async function initializeStore() {
-      try {
-        const [productData, customerData] = await Promise.all([
-          getProducts(),
-          getCustomers(),
-        ]);
 
+    fetchStoreData()
+      .then((data) => {
         if (cancelled) {
           return;
         }
 
         setProducts(
-          productData.filter(
-            (product) => product.is_active
-          )
+          data.products
         );
 
         setCustomers(
-          customerData.filter(
-            (customer) => customer.is_active
-          )
+          data.customers
         );
-      } catch (err) {
+      })
+      .catch((err) => {
         if (cancelled) {
           return;
         }
@@ -184,14 +165,13 @@ function StorePage() {
             ? err.message
             : "Failed to load the online store."
         );
-      } finally {
+      })
+      .finally(() => {
         if (!cancelled) {
           setLoading(false);
         }
-      }
-    }
+      });
 
-    void initializeStore();
 
     return () => {
       cancelled = true;
@@ -200,16 +180,45 @@ function StorePage() {
 
 
   /* =========================
-     CART
+     REFRESH STORE DATA
+  ========================= */
+
+  async function refreshStoreData() {
+    try {
+      const data =
+        await fetchStoreData();
+
+      setProducts(
+        data.products
+      );
+
+      setCustomers(
+        data.customers
+      );
+
+      setError(null);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to refresh the online store."
+      );
+    }
+  }
+
+
+  /* =========================
+     CART DATA
   ========================= */
 
   const cartItems =
     useMemo<CartItem[]>(() => {
-
       return products
         .filter(
           (product) =>
-            (cart[product.id] || 0) > 0
+            (
+              cart[product.id] || 0
+            ) > 0
         )
         .map(
           (product) => ({
@@ -218,7 +227,6 @@ function StorePage() {
               cart[product.id] || 0,
           })
         );
-
     }, [
       products,
       cart,
@@ -227,19 +235,17 @@ function StorePage() {
 
   const totalCartItems =
     useMemo(() => {
-
       return cartItems.reduce(
         (total, item) =>
-          total + item.quantity,
+          total +
+          item.quantity,
         0
       );
-
     }, [cartItems]);
 
 
   const cartTotal =
     useMemo(() => {
-
       return cartItems.reduce(
         (total, item) =>
           total +
@@ -249,23 +255,24 @@ function StorePage() {
           ),
         0
       );
-
     }, [cartItems]);
 
+
+  /* =========================
+     ADD TO CART
+  ========================= */
 
   function addToCart(
     product: Product
   ) {
-
     setSuccessMessage(null);
-
 
     setCart(
       (currentCart) => {
-
         const currentQuantity =
-          currentCart[product.id] || 0;
-
+          currentCart[
+            product.id
+          ] || 0;
 
         if (
           currentQuantity >=
@@ -273,7 +280,6 @@ function StorePage() {
         ) {
           return currentCart;
         }
-
 
         return {
           ...currentCart,
@@ -285,17 +291,20 @@ function StorePage() {
     );
   }
 
+
+  /* =========================
+     INCREASE QUANTITY
+  ========================= */
 
   function increaseQuantity(
     product: Product
   ) {
-
     setCart(
       (currentCart) => {
-
         const currentQuantity =
-          currentCart[product.id] || 0;
-
+          currentCart[
+            product.id
+          ] || 0;
 
         if (
           currentQuantity >=
@@ -303,7 +312,6 @@ function StorePage() {
         ) {
           return currentCart;
         }
-
 
         return {
           ...currentCart,
@@ -316,32 +324,33 @@ function StorePage() {
   }
 
 
+  /* =========================
+     DECREASE QUANTITY
+  ========================= */
+
   function decreaseQuantity(
     productId: number
   ) {
-
     setCart(
       (currentCart) => {
-
         const currentQuantity =
-          currentCart[productId] || 0;
+          currentCart[
+            productId
+          ] || 0;
 
-
-        if (currentQuantity <= 1) {
-
+        if (
+          currentQuantity <= 1
+        ) {
           const updatedCart = {
             ...currentCart,
           };
-
 
           delete updatedCart[
             productId
           ];
 
-
           return updatedCart;
         }
-
 
         return {
           ...currentCart,
@@ -354,22 +363,22 @@ function StorePage() {
   }
 
 
+  /* =========================
+     REMOVE FROM CART
+  ========================= */
+
   function removeFromCart(
     productId: number
   ) {
-
     setCart(
       (currentCart) => {
-
         const updatedCart = {
           ...currentCart,
         };
 
-
         delete updatedCart[
           productId
         ];
-
 
         return updatedCart;
       }
@@ -382,9 +391,9 @@ function StorePage() {
   ========================= */
 
   async function handleCheckout() {
-
-    if (cartItems.length === 0) {
-
+    if (
+      cartItems.length === 0
+    ) {
       setCheckoutError(
         "Your cart is empty."
       );
@@ -392,14 +401,12 @@ function StorePage() {
       return;
     }
 
-
     setCheckingOut(true);
     setCheckoutError(null);
     setSuccessMessage(null);
 
 
     try {
-
       const order =
         await checkoutOrder(
           paymentMethod,
@@ -439,25 +446,25 @@ function StorePage() {
 
 
       setCart({});
-      setSelectedCustomerId(null);
-      setPaymentMethod("gcash");
+
+      setSelectedCustomerId(
+        null
+      );
+
+      setPaymentMethod(
+        "gcash"
+      );
+
       setShowCart(false);
 
 
-      await loadStoreData();
-
+      await refreshStoreData();
     } catch (err) {
-
-      if (err instanceof Error) {
-        setCheckoutError(
-          err.message
-        );
-      } else {
-        setCheckoutError(
-          "Online checkout failed."
-        );
-      }
-
+      setCheckoutError(
+        err instanceof Error
+          ? err.message
+          : "Online checkout failed."
+      );
     } finally {
       setCheckingOut(false);
     }
@@ -469,14 +476,11 @@ function StorePage() {
   ========================= */
 
   if (loading) {
-
     return (
       <main className="store-page">
-
         <p>
           Loading online store...
         </p>
-
       </main>
     );
   }
@@ -484,15 +488,12 @@ function StorePage() {
 
   return (
     <main className="store-page">
-
       {/* =========================
           STORE HEADER
       ========================= */}
 
       <header className="store-header">
-
         <div>
-
           <span className="store-brand">
             OmniPOS
           </span>
@@ -504,7 +505,6 @@ function StorePage() {
           <p>
             Order directly from the restaurant.
           </p>
-
         </div>
 
 
@@ -517,7 +517,6 @@ function StorePage() {
         >
           Cart · {totalCartItems}
         </button>
-
       </header>
 
 
@@ -526,11 +525,9 @@ function StorePage() {
       ========================= */}
 
       {successMessage && (
-
         <div className="store-success-message">
           {successMessage}
         </div>
-
       )}
 
 
@@ -539,11 +536,9 @@ function StorePage() {
       ========================= */}
 
       {error && (
-
         <p className="error-message">
           {error}
         </p>
-
       )}
 
 
@@ -552,7 +547,6 @@ function StorePage() {
       ========================= */}
 
       <section className="direct-order-banner">
-
         <span>
           Direct Order
         </span>
@@ -566,7 +560,6 @@ function StorePage() {
           restaurant inventory as
           physical POS transactions.
         </p>
-
       </section>
 
 
@@ -575,11 +568,8 @@ function StorePage() {
       ========================= */}
 
       <section className="store-menu-section">
-
         <div className="store-section-header">
-
           <div>
-
             <p className="page-eyebrow">
               Online Menu
             </p>
@@ -587,21 +577,17 @@ function StorePage() {
             <h2>
               Menu
             </h2>
-
           </div>
 
 
           <span className="muted-text">
             {products.length} products
           </span>
-
         </div>
 
 
         {products.length === 0 ? (
-
           <div className="empty-state">
-
             <strong>
               No products available
             </strong>
@@ -610,33 +596,26 @@ function StorePage() {
               Products will appear here
               when they are available.
             </span>
-
           </div>
-
         ) : (
-
           <div className="store-product-grid">
-
             {products.map(
               (product) => {
-
                 const quantityInCart =
-                  cart[product.id] || 0;
-
+                  cart[
+                    product.id
+                  ] || 0;
 
                 const outOfStock =
                   product.stock <= 0;
 
 
                 return (
-
                   <article
                     key={product.id}
                     className="store-product-card"
                   >
-
                     <div className="store-product-info">
-
                       <span className="page-eyebrow">
                         {
                           product.category ||
@@ -654,25 +633,20 @@ function StorePage() {
                         Available stock:{" "}
                         {product.stock}
                       </p>
-
                     </div>
 
 
                     <div className="store-product-footer">
-
                       <strong className="store-product-price">
-
                         {formatPeso(
                           product.price
                         )}
-
                       </strong>
 
 
-                      {quantityInCart > 0 ? (
-
+                      {quantityInCart >
+                      0 ? (
                         <div className="store-quantity-control">
-
                           <button
                             type="button"
                             onClick={() =>
@@ -686,7 +660,9 @@ function StorePage() {
 
 
                           <span>
-                            {quantityInCart}
+                            {
+                              quantityInCart
+                            }
                           </span>
 
 
@@ -704,11 +680,8 @@ function StorePage() {
                           >
                             +
                           </button>
-
                         </div>
-
                       ) : (
-
                         <button
                           type="button"
                           className="primary-button"
@@ -721,27 +694,18 @@ function StorePage() {
                             )
                           }
                         >
-
                           {outOfStock
                             ? "Out of Stock"
                             : "Add to Cart"}
-
                         </button>
-
                       )}
-
                     </div>
-
                   </article>
-
                 );
               }
             )}
-
           </div>
-
         )}
-
       </section>
 
 
@@ -750,17 +714,12 @@ function StorePage() {
       ========================= */}
 
       {showCart && (
-
         <div className="modal-backdrop">
-
           <div className="payment-modal store-cart-modal">
-
             {/* HEADER */}
 
             <div className="payment-modal-header">
-
               <div>
-
                 <p className="page-eyebrow">
                   Online Order
                 </p>
@@ -768,29 +727,28 @@ function StorePage() {
                 <h2>
                   Your Cart
                 </h2>
-
               </div>
 
 
               <button
                 type="button"
                 className="modal-close"
+                disabled={
+                  checkingOut
+                }
                 onClick={() =>
                   setShowCart(false)
                 }
               >
                 ×
               </button>
-
             </div>
 
 
             {/* EMPTY CART */}
 
             {cartItems.length === 0 ? (
-
               <div className="empty-state">
-
                 <strong>
                   Your cart is empty
                 </strong>
@@ -799,39 +757,30 @@ function StorePage() {
                   Add menu items before
                   checking out.
                 </span>
-
               </div>
-
             ) : (
-
               <>
-
                 {/* CART ITEMS */}
 
                 <div className="order-detail-items">
-
                   {cartItems.map(
                     (item) => (
-
                       <div
                         key={
                           item.product.id
                         }
                         className="order-detail-item"
                       >
-
                         <div>
-
                           <strong>
                             {
-                              item.product
+                              item
+                                .product
                                 .name
                             }
                           </strong>
 
-
                           <span>
-
                             {formatPeso(
                               item.product
                                 .price
@@ -839,52 +788,48 @@ function StorePage() {
 
                             {" × "}
 
-                            {item.quantity}
-
+                            {
+                              item.quantity
+                            }
                           </span>
-
                         </div>
 
 
                         <div className="store-cart-item-actions">
-
                           <strong>
-
                             {formatPeso(
                               item.product
                                 .price *
-                              item.quantity
+                                item.quantity
                             )}
-
                           </strong>
 
 
                           <button
                             type="button"
                             className="store-remove-button"
+                            disabled={
+                              checkingOut
+                            }
                             onClick={() =>
                               removeFromCart(
-                                item.product.id
+                                item.product
+                                  .id
                               )
                             }
                           >
                             Remove
                           </button>
-
                         </div>
-
                       </div>
-
                     )
                   )}
-
                 </div>
 
 
                 {/* TOTAL */}
 
                 <div className="order-detail-total">
-
                   <span>
                     Total
                   </span>
@@ -894,14 +839,12 @@ function StorePage() {
                       cartTotal
                     )}
                   </strong>
-
                 </div>
 
 
                 {/* CUSTOMER */}
 
                 <div className="payment-section">
-
                   <label
                     htmlFor="online-customer"
                   >
@@ -919,20 +862,22 @@ function StorePage() {
                     disabled={
                       checkingOut
                     }
-                    onChange={(event) => {
-
+                    onChange={(
+                      event
+                    ) => {
                       const value =
-                        event.target.value;
-
+                        event.target
+                          .value;
 
                       setSelectedCustomerId(
                         value
-                          ? Number(value)
+                          ? Number(
+                              value
+                            )
                           : null
                       );
                     }}
                   >
-
                     <option value="">
                       Guest Customer
                     </option>
@@ -940,7 +885,6 @@ function StorePage() {
 
                     {customers.map(
                       (customer) => (
-
                         <option
                           key={
                             customer.id
@@ -949,40 +893,36 @@ function StorePage() {
                             customer.id
                           }
                         >
-                          {customer.name}
+                          {
+                            customer.name
+                          }
+
                           {customer.phone
                             ? ` · ${customer.phone}`
                             : ""}
                         </option>
-
                       )
                     )}
-
                   </select>
 
 
                   <small>
-
                     Guest orders are recorded
                     without a registered
                     customer profile.
-
                   </small>
-
                 </div>
 
 
                 {/* PAYMENT */}
 
                 <div className="payment-section">
-
                   <span>
                     Payment Method
                   </span>
 
 
                   <div className="payment-method-grid">
-
                     <button
                       type="button"
                       className={
@@ -1044,7 +984,6 @@ function StorePage() {
                     >
                       Card
                     </button>
-
                   </div>
 
 
@@ -1052,18 +991,17 @@ function StorePage() {
                     Development checkout only.
                     No real payment is processed.
                   </small>
-
                 </div>
 
 
                 {/* CHECKOUT ERROR */}
 
                 {checkoutError && (
-
                   <p className="error-message">
-                    {checkoutError}
+                    {
+                      checkoutError
+                    }
                   </p>
-
                 )}
 
 
@@ -1074,31 +1012,24 @@ function StorePage() {
                   className="primary-button"
                   disabled={
                     checkingOut ||
-                    cartItems.length === 0
+                    cartItems.length ===
+                      0
                   }
                   onClick={
                     handleCheckout
                   }
                 >
-
                   {checkingOut
                     ? "Placing Order..."
                     : `Place Online Order · ${formatPeso(
                         cartTotal
                       )}`}
-
                 </button>
-
               </>
-
             )}
-
           </div>
-
         </div>
-
       )}
-
     </main>
   );
 }

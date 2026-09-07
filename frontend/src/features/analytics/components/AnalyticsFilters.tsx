@@ -1,6 +1,6 @@
 import type {
   AnalyticsPeriod,
-} from "@/services/api";
+} from "../types/analytics.types";
 
 
 type Props = {

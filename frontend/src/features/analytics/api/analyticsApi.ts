@@ -1,7 +1,7 @@
 import type {
   AnalyticsOverview,
   AnalyticsOverviewParams,
-} from "@/services/api";
+} from "../types/analytics.types";
 
 import {
   apiRequest,

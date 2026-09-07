@@ -1,6 +1,6 @@
 import type {
   Customer,
-} from "@/services/api";
+} from "../types/customer.types";
 
 
 type Props = {

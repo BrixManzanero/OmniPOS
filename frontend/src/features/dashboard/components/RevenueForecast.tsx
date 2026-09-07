@@ -11,7 +11,7 @@ import {
 
 import type {
   DashboardAnalytics,
-} from "@/services/api";
+} from "../types/dashboard.types";
 
 import {
   formatPeso,

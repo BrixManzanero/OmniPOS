@@ -8,7 +8,7 @@ import {
   YAxis,
 } from "recharts";
 
-import type { DashboardAnalytics } from "@/services/api";
+import type { DashboardAnalytics } from "../types/dashboard.types";
 import { formatPeso } from "@/utils/formatters";
 
 type Props = {

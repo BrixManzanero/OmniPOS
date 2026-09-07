@@ -1,104 +1,63 @@
 import {
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 
 import {
   getDashboardAnalytics,
   getDashboardSummary,
-  type DashboardAnalytics,
-  type DashboardSummary,
-} from "@/services/api";
+} from "../api/dashboardApi";
+
+import type {
+  DashboardAnalytics,
+  DashboardSummary,
+} from "../types/dashboard.types";
 
 
 const REFRESH_INTERVAL_MS = 5000;
 
 
 export function useDashboardData() {
+  const [summary, setSummary] =
+    useState<DashboardSummary | null>(null);
 
-  const [
-    summary,
-    setSummary,
-  ] = useState<DashboardSummary | null>(
-    null
-  );
+  const [analytics, setAnalytics] =
+    useState<DashboardAnalytics | null>(null);
 
+  const [loading, setLoading] =
+    useState(true);
 
-  const [
-    analytics,
-    setAnalytics,
-  ] = useState<DashboardAnalytics | null>(
-    null
-  );
+  const [refreshing, setRefreshing] =
+    useState(false);
 
+  const [error, setError] =
+    useState("");
 
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
-
-
-  const [
-    refreshing,
-    setRefreshing,
-  ] = useState(false);
-
-
-  const [
-    error,
-    setError,
-  ] = useState("");
-
-
-  const [
-    refreshError,
-    setRefreshError,
-  ] = useState("");
-
-
-  /*
-   * Prevent multiple dashboard requests
-   * from running at the same time.
-   */
-  const requestInProgress =
-    useRef(false);
+  const [refreshError, setRefreshError] =
+    useState("");
 
 
   useEffect(() => {
-
-    let cancelled =
-      false;
+    let cancelled = false;
+    let requestInProgress = false;
 
 
     async function loadDashboard(
-      initialLoad = false
+      initial = false
     ) {
-
-      if (
-        requestInProgress.current
-      ) {
+      if (requestInProgress) {
         return;
       }
 
-
-      requestInProgress.current =
-        true;
+      requestInProgress = true;
 
 
       try {
-
-        if (initialLoad) {
-
+        if (initial) {
           setLoading(true);
-          setError("");
-
         } else {
-
           setRefreshing(true);
-          setRefreshError("");
-
         }
 
 
@@ -116,24 +75,12 @@ export function useDashboardData() {
         }
 
 
-        setSummary(
-          summaryData
-        );
+        setSummary(summaryData);
+        setAnalytics(analyticsData);
 
-        setAnalytics(
-          analyticsData
-        );
-
-
-        /*
-         * Clear errors after
-         * a successful request.
-         */
         setError("");
         setRefreshError("");
-
       } catch (err) {
-
         if (cancelled) {
           return;
         }
@@ -145,207 +92,119 @@ export function useDashboardData() {
             : "Failed to load dashboard.";
 
 
-        /*
-         * Initial failure:
-         * show normal dashboard error.
-         *
-         * Background refresh failure:
-         * keep existing dashboard visible.
-         */
-        if (initialLoad) {
-
-          setError(
-            message
-          );
-
+        if (initial) {
+          setError(message);
         } else {
-
-          setRefreshError(
-            message
-          );
-
+          setRefreshError(message);
         }
-
       } finally {
-
-        requestInProgress.current =
-          false;
+        requestInProgress = false;
 
 
         if (!cancelled) {
-
           setLoading(false);
           setRefreshing(false);
-
         }
-
       }
-
     }
 
 
-    /*
-     * Load immediately when
-     * Dashboard opens.
-     */
-    loadDashboard(true);
+    void loadDashboard(true);
 
 
-    /*
-     * Auto-refresh real backend
-     * data every 5 seconds.
-     */
-    const interval =
+    const intervalId =
       window.setInterval(
         () => {
-
-          loadDashboard(false);
-
+          void loadDashboard();
         },
         REFRESH_INTERVAL_MS
       );
 
 
     return () => {
-
       cancelled = true;
 
       window.clearInterval(
-        interval
+        intervalId
       );
-
     };
-
   }, []);
 
 
-  /* =========================
-     7-DAY SALES
-  ========================= */
-
-  const sevenDaySales =
-    useMemo(() => {
-
-      return (
-        analytics
-          ?.sales_last_7_days
-          .reduce(
-            (
-              total,
-              day
-            ) =>
-              total +
-              day.sales,
-            0
-          ) ?? 0
-      );
-
-    }, [
-      analytics,
-    ]);
+  const {
+    sevenDaySales,
+    sevenDayOrders,
+  } = useMemo(() => {
+    const sales =
+      analytics?.sales_last_7_days ?? [];
 
 
-  /* =========================
-     7-DAY ORDERS
-  ========================= */
+    return sales.reduce(
+      (totals, day) => ({
+        sevenDaySales:
+          totals.sevenDaySales +
+          day.sales,
 
-  const sevenDayOrders =
-    useMemo(() => {
+        sevenDayOrders:
+          totals.sevenDayOrders +
+          day.orders,
+      }),
+      {
+        sevenDaySales: 0,
+        sevenDayOrders: 0,
+      }
+    );
+  }, [analytics]);
 
-      return (
-        analytics
-          ?.sales_last_7_days
-          .reduce(
-            (
-              total,
-              day
-            ) =>
-              total +
-              day.orders,
-            0
-          ) ?? 0
-      );
-
-    }, [
-      analytics,
-    ]);
-
-
-  /* =========================
-     AVERAGE ORDER VALUE
-  ========================= */
 
   const averageOrderValue =
     sevenDayOrders > 0
-      ? (
-          sevenDaySales /
-          sevenDayOrders
-        )
+      ? sevenDaySales /
+        sevenDayOrders
       : 0;
 
 
-  /* =========================
-     FORECAST CHART DATA
-  ========================= */
-
   const forecastChartData =
     useMemo(() => {
-
       if (!analytics) {
         return [];
       }
 
 
       const historical =
-        analytics
-          .sales_last_7_days
-          .map(
-            (day) => ({
-              label:
-                day.label,
-
-              actual:
-                day.sales,
-
-              forecast:
-                null as number | null,
-            })
-          );
+        analytics.sales_last_7_days.map(
+          (day) => ({
+            label: day.label,
+            actual: day.sales,
+            forecast:
+              null as number | null,
+          })
+        );
 
 
-      const lastHistorical =
-        analytics
-          .sales_last_7_days[
-            analytics
-              .sales_last_7_days
-              .length - 1
-          ];
+      const last =
+        analytics.sales_last_7_days.at(
+          -1
+        );
 
 
-      const bridgePoint =
-        lastHistorical
-          ? {
-              label:
-                lastHistorical.label,
-
-              actual:
-                lastHistorical.sales,
-
-              forecast:
-                lastHistorical.sales,
-            }
-          : null;
+      const bridge = last
+        ? [
+            {
+              label: last.label,
+              actual: last.sales,
+              forecast: last.sales,
+            },
+          ]
+        : [];
 
 
       const future =
         analytics.forecast.map(
           (day) => ({
-            label:
-              day.label,
-
+            label: day.label,
             actual:
               null as number | null,
-
             forecast:
               day.forecast_sales,
           })
@@ -353,23 +212,11 @@ export function useDashboardData() {
 
 
       return [
-        ...historical.slice(
-          0,
-          -1
-        ),
-
-        ...(
-          bridgePoint
-            ? [bridgePoint]
-            : []
-        ),
-
+        ...historical.slice(0, -1),
+        ...bridge,
         ...future,
       ];
-
-    }, [
-      analytics,
-    ]);
+    }, [analytics]);
 
 
   return {

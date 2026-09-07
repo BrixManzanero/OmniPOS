@@ -1,4 +1,4 @@
-import type { Order } from "@/services/api";
+import type { Order } from "../types/order.types";
 import { formatPeso } from "@/utils/formatters";
 
 

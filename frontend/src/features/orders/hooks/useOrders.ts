@@ -6,61 +6,95 @@ import {
 
 import {
   getOrders,
-  type Order,
-} from "@/services/api";
+} from "../api/ordersApi";
+
+import type {
+  Order,
+} from "../types/order.types";
 
 
 export function useOrders() {
-  const [orders, setOrders] =
-    useState<Order[]>([]);
+  const [
+    orders,
+    setOrders,
+  ] = useState<Order[]>([]);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
 
-  const [error, setError] =
-    useState("");
+  const [
+    error,
+    setError,
+  ] = useState("");
 
+
+  /* =========================
+     LOAD ORDERS
+  ========================= */
 
   useEffect(() => {
-    async function loadOrders() {
-      try {
-        setLoading(true);
-        setError("");
+    let cancelled = false;
 
-        const data =
-          await getOrders();
 
-        setOrders(data);
-
-      } catch (error) {
-        if (error instanceof Error) {
-          setError(error.message);
+    getOrders()
+      .then((data) => {
+        if (cancelled) {
+          return;
         }
 
-      } finally {
-        setLoading(false);
-      }
-    }
+        setOrders(data);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
 
-    loadOrders();
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load orders."
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+
+  /* =========================
+     TOTAL REVENUE
+  ========================= */
 
   const totalRevenue =
     useMemo(() => {
       return orders.reduce(
         (total, order) =>
-          total + order.total_amount,
+          total +
+          order.total_amount,
         0
       );
     }, [orders]);
 
 
+  /* =========================
+     COMPLETED ORDERS
+  ========================= */
+
   const completedOrders =
     useMemo(() => {
       return orders.filter(
         (order) =>
-          order.status === "completed"
+          order.status ===
+          "completed"
       ).length;
     }, [orders]);
 

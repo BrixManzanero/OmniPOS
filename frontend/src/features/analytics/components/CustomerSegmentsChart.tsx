@@ -11,7 +11,7 @@ import {
 
 import type {
   AnalyticsOverview,
-} from "@/services/api";
+} from "../types/analytics.types";
 
 import {
   formatPeso,

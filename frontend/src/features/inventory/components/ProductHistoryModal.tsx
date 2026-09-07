@@ -1,6 +1,6 @@
 import type {
   InventoryMovement,
-} from "@/services/api";
+} from "../types/inventory.types";
 
 import type {
   Product,

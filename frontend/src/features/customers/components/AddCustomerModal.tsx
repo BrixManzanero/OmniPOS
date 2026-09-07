@@ -4,7 +4,7 @@ import {
 
 import type {
   CustomerCreate,
-} from "@/services/api";
+} from "../types/customer.types";
 
 
 type Props = {
