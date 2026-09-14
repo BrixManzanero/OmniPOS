@@ -1,401 +1,101 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useMemo, useState } from "react";
 
-import {
-  checkoutOrder,
-} from "../orders/api/ordersApi";
+import { checkoutOrder } from "../orders/api/ordersApi";
+import type { PaymentMethod } from "../orders/types/order.types";
+import { useCart } from "@/shared/hooks/useCart";
+import { useLiveProducts } from "@/shared/hooks/useLiveProducts";
+import type { CartConflict } from "@/shared/types/cart.types";
+import type { Product } from "@/types/product";
 
-import type {
-  PaymentMethod,
-} from "../orders/types/order.types";
-
-import {
-  getProducts,
-} from "../products/api/productsApi";
-
-import {
-  getCustomers,
-} from "../customers/api/customersApi";
-
-import type {
-  Customer,
-} from "../customers/types/customer.types";
-
-import type {
-  Product,
-} from "@/types/product";
-
-
-type CartItem = {
-  product: Product;
-  quantity: number;
-};
-
-
-function POSPage() {
-  const [products, setProducts] =
-    useState<Product[]>([]);
-
-  const [customers, setCustomers] =
-    useState<Customer[]>([]);
-
-  const [cart, setCart] =
-    useState<CartItem[]>([]);
-
-
-  const [
-    selectedCustomerId,
-    setSelectedCustomerId,
-  ] = useState<number | null>(null);
-
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [
-    customersLoading,
-    setCustomersLoading,
-  ] = useState(true);
-
-
-  const [error, setError] =
-    useState("");
-
-  const [message, setMessage] =
-    useState("");
-
-
-  const [
-    showPayment,
-    setShowPayment,
-  ] = useState(false);
-
-
-  const [
-    paymentMethod,
-    setPaymentMethod,
-  ] = useState<PaymentMethod>("cash");
-
-
-  const [processing, setProcessing] =
-    useState(false);
-
-
-  /* =========================
-     LOAD PRODUCTS
-  ========================= */
-
-  async function loadProducts() {
-    try {
-      const data =
-        await getProducts();
-
-      setProducts(
-        data.filter(
-          (product) =>
-            product.is_active &&
-            product.stock > 0
-        )
-      );
-
-    } catch (error) {
-
-      if (error instanceof Error) {
-        setError(error.message);
-      }
-
-    } finally {
-      setLoading(false);
-    }
-  }
-
-
-  /* =========================
-     INITIAL LOAD
-  ========================= */
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function initializePos() {
-      try {
-        const [productData, customerData] = await Promise.all([
-          getProducts(),
-          getCustomers(),
-        ]);
-
-        if (cancelled) {
-          return;
-        }
-
-        setProducts(
-          productData.filter(
-            (product) =>
-              product.is_active &&
-              product.stock > 0
-          )
-        );
-
-        setCustomers(
-          customerData.filter(
-            (customer) => customer.is_active
-          )
-        );
-      } catch (error) {
-        if (!cancelled && error instanceof Error) {
-          setError(error.message);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-          setCustomersLoading(false);
-        }
-      }
-    }
-
-    void initializePos();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-
-  /* =========================
-   ADD TO CART
-========================= */
-
-function addToCart(
-  product: Product
-) {
-  setCart((currentCart) => {
-
-    const existingItem =
-      currentCart.find(
-        (item) =>
-          item.product.id ===
-          product.id
-      );
-
-
-    // Product is already in the order.
-    // Quantity must only be changed
-    // using the + / - controls.
-    if (existingItem) {
-      return currentCart;
-    }
-
-
-    // Do not add unavailable products.
-    if (product.stock <= 0) {
-      return currentCart;
-    }
-
-
-    return [
-      ...currentCart,
-      {
-        product,
-        quantity: 1,
-      },
-    ];
-  });
+function describeConflict(conflict: CartConflict): string {
+  return conflict.available > 0
+    ? `Only ${conflict.available} left of ${conflict.productName} — another sale took the rest.`
+    : `${conflict.productName} just sold out on another channel.`;
 }
 
+function POSPage() {
+  // The till only sells what is on the shelf, so out-of-stock items are
+  // hidden here. Polling means an online sale reaches this terminal.
+  const {
+    products,
+    customers,
+    loading,
+    error: loadError,
+    refresh,
+  } = useLiveProducts({
+    inStockOnly: true,
+    withCustomers: true,
+  });
 
-  /* =========================
-     INCREASE QUANTITY
-  ========================= */
+  const cart = useCart(products);
 
-  function increaseQuantity(
-    productId: number
-  ) {
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(
+    null
+  );
+  const [showPayment, setShowPayment] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
+  const [processing, setProcessing] = useState(false);
+  const [message, setMessage] = useState("");
+  const [checkoutError, setCheckoutError] = useState("");
 
-    setCart((currentCart) =>
-      currentCart.map((item) => {
+  const selectedCustomer = useMemo(
+    () =>
+      customers.find((customer) => customer.id === selectedCustomerId) ?? null,
+    [customers, selectedCustomerId]
+  );
 
-        if (
-          item.product.id !==
-          productId
-        ) {
-          return item;
-        }
+  // A conflict outranks other messages: the cashier is about to take money
+  // for stock that is no longer there, and needs to know before they do.
+  const error = cart.hasConflicts
+    ? describeConflict(cart.conflicts[0])
+    : checkoutError || loadError;
 
+  // The markup below still uses these names.
+  const cartLines = cart.items;
+  const totalItems = cart.count;
+  const subtotal = cart.subtotal;
+  const increaseQuantity = cart.increase;
+  const decreaseQuantity = cart.decrease;
+  const removeItem = cart.remove;
+  const customersLoading = loading;
 
-        if (
-          item.quantity >=
-          item.product.stock
-        ) {
-          return item;
-        }
-
-
-        return {
-          ...item,
-
-          quantity:
-            item.quantity + 1,
-        };
-      })
-    );
+  function addToCart(product: Product) {
+    setMessage("");
+    cart.add(product);
   }
-
-
-  /* =========================
-     DECREASE QUANTITY
-  ========================= */
-
-  function decreaseQuantity(
-    productId: number
-  ) {
-
-    setCart((currentCart) =>
-      currentCart
-        .map((item) =>
-          item.product.id ===
-          productId
-            ? {
-                ...item,
-
-                quantity:
-                  item.quantity - 1,
-              }
-            : item
-        )
-
-        .filter(
-          (item) =>
-            item.quantity > 0
-        )
-    );
-  }
-
-
-  /* =========================
-     REMOVE ITEM
-  ========================= */
-
-  function removeItem(
-    productId: number
-  ) {
-
-    setCart((currentCart) =>
-      currentCart.filter(
-        (item) =>
-          item.product.id !==
-          productId
-      )
-    );
-  }
-
-
-  /* =========================
-     CLEAR CART
-  ========================= */
 
   function clearCart() {
-    setCart([]);
+    cart.clear();
     setMessage("");
+    setCheckoutError("");
   }
 
-
-  /* =========================
-     TOTAL ITEMS
-  ========================= */
-
-  const totalItems = useMemo(
-    () =>
-      cart.reduce(
-        (total, item) =>
-          total + item.quantity,
-        0
-      ),
-    [cart]
-  );
-
-
-  /* =========================
-     SUBTOTAL
-  ========================= */
-
-  const subtotal = useMemo(
-    () =>
-      cart.reduce(
-        (total, item) =>
-          total +
-          item.product.price *
-            item.quantity,
-        0
-      ),
-    [cart]
-  );
-
-
-  /* =========================
-     SELECTED CUSTOMER
-  ========================= */
-
-  const selectedCustomer =
-    useMemo(
-      () =>
-        customers.find(
-          (customer) =>
-            customer.id ===
-            selectedCustomerId
-        ) ?? null,
-
-      [
-        customers,
-        selectedCustomerId,
-      ]
-    );
-
-
-  /* =========================
-     CHECKOUT
-  ========================= */
-
   async function handleCheckout() {
-
-    if (cart.length === 0) {
+    if (cart.isEmpty) {
       return;
     }
 
+    // Trim to what is actually on hand rather than sending an order the
+    // server will reject. The cashier can still ring up the rest.
+    if (cart.hasConflicts) {
+      cart.reconcile();
+      setCheckoutError("Cart updated to match available stock. Review and retry.");
+      return;
+    }
 
     setProcessing(true);
-
-    setError("");
+    setCheckoutError("");
     setMessage("");
 
-
     try {
+      const order = await checkoutOrder(
+        paymentMethod,
+        cart.checkoutItems,
+        selectedCustomerId,
+        "POS"
+      );
 
-      const order =
-        await checkoutOrder(
-          paymentMethod,
-
-          cart.map((item) => ({
-            product_id:
-              item.product.id,
-
-            quantity:
-              item.quantity,
-          })),
-
-          selectedCustomerId,
-
-          "POS"
-        );
-
-
-      const customerLabel =
-        selectedCustomer
-          ? selectedCustomer.name
-          : "Walk-in Customer";
-
+      const customerLabel = selectedCustomer?.name ?? "Walk-in Customer";
 
       setMessage(
         `Sale completed! Order #${order.id} — ₱${order.total_amount.toFixed(
@@ -403,28 +103,18 @@ function addToCart(
         )} — ${customerLabel}`
       );
 
-
-      setCart([]);
-
+      cart.clear();
       setShowPayment(false);
-
       setPaymentMethod("cash");
-
       setSelectedCustomerId(null);
 
-
-      await loadProducts();
-
-    } catch (error) {
-
-      if (error instanceof Error) {
-        setError(error.message);
+      await refresh();
+    } catch (caught) {
+      if (caught instanceof Error) {
+        setCheckoutError(caught.message);
       }
-
     } finally {
-
       setProcessing(false);
-
     }
   }
 
@@ -620,7 +310,7 @@ function addToCart(
             </div>
 
 
-            {cart.length > 0 && (
+            {cartLines.length > 0 && (
 
               <button
                 type="button"
@@ -635,7 +325,7 @@ function addToCart(
           </div>
 
 
-          {cart.length === 0 ? (
+          {cartLines.length === 0 ? (
 
             <div className="empty-cart">
 
@@ -655,7 +345,7 @@ function addToCart(
 
             <div className="cart-items">
 
-              {cart.map((item) => (
+              {cartLines.map((item) => (
 
                 <div
                   className="cart-item"
@@ -791,7 +481,7 @@ function addToCart(
             className="primary-button checkout-button"
 
             disabled={
-              cart.length === 0
+              cartLines.length === 0
             }
 
             onClick={() =>

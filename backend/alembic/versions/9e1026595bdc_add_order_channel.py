@@ -2,6 +2,10 @@
 
 Revision ID: 9e1026595bdc
 Revises: 3e34ffb2e2d0
+
+Uses batch_alter_table so this runs on SQLite as well as
+PostgreSQL. SQLite has no ALTER COLUMN, which the original
+server_default removal relied on.
 """
 
 from typing import Sequence, Union
@@ -23,29 +27,41 @@ def upgrade() -> None:
 
     # Add the column and automatically assign
     # existing orders as POS orders.
-    op.add_column(
+    with op.batch_alter_table(
         "orders",
-        sa.Column(
-            "order_channel",
-            sa.String(),
-            nullable=False,
-            server_default="POS"
+        schema=None,
+    ) as batch_op:
+
+        batch_op.add_column(
+            sa.Column(
+                "order_channel",
+                sa.String(),
+                nullable=False,
+                server_default="POS",
+            )
         )
-    )
 
     # Remove the database default afterward.
-    # The application will decide POS or ONLINE.
-    op.alter_column(
+    # The application decides POS or ONLINE.
+    with op.batch_alter_table(
         "orders",
-        "order_channel",
-        server_default=None
-    )
+        schema=None,
+    ) as batch_op:
+
+        batch_op.alter_column(
+            "order_channel",
+            existing_type=sa.String(),
+            existing_nullable=False,
+            server_default=None,
+        )
 
 
 def downgrade() -> None:
     """Remove order channel."""
 
-    op.drop_column(
+    with op.batch_alter_table(
         "orders",
-        "order_channel"
-    )
+        schema=None,
+    ) as batch_op:
+
+        batch_op.drop_column("order_channel")

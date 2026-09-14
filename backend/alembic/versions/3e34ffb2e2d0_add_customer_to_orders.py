@@ -3,6 +3,12 @@
 Revision ID: 3e34ffb2e2d0
 Revises: 3980241820e2
 Create Date: 2026-09-04 17:50:38.642935
+
+Uses batch_alter_table so this runs on SQLite as well as
+PostgreSQL. SQLite cannot ALTER a constraint onto an existing
+table; batch mode works around that by rebuilding the table,
+and on PostgreSQL it emits the same plain ALTER statements as
+before.
 """
 
 from typing import Sequence, Union
@@ -23,52 +29,52 @@ def upgrade() -> None:
     """Upgrade schema."""
 
     # Add customer_id column to orders.
-    # Nullable so existing and walk-in orders can remain without a customer.
-    op.add_column(
+    # Nullable so existing and walk-in orders
+    # can remain without a customer.
+    with op.batch_alter_table(
         "orders",
-        sa.Column(
-            "customer_id",
-            sa.Integer(),
-            nullable=True
+        schema=None,
+    ) as batch_op:
+
+        batch_op.add_column(
+            sa.Column(
+                "customer_id",
+                sa.Integer(),
+                nullable=True,
+            )
         )
-    )
 
-    # Add index for faster customer-order queries.
-    op.create_index(
-        op.f("ix_orders_customer_id"),
-        "orders",
-        ["customer_id"],
-        unique=False
-    )
+        # Index for faster customer-order queries.
+        batch_op.create_index(
+            batch_op.f("ix_orders_customer_id"),
+            ["customer_id"],
+            unique=False,
+        )
 
-    # Link orders.customer_id to customers.id.
-    op.create_foreign_key(
-        "fk_orders_customer_id_customers",
-        "orders",
-        "customers",
-        ["customer_id"],
-        ["id"]
-    )
+        # Link orders.customer_id to customers.id.
+        batch_op.create_foreign_key(
+            "fk_orders_customer_id_customers",
+            "customers",
+            ["customer_id"],
+            ["id"],
+        )
 
 
 def downgrade() -> None:
     """Downgrade schema."""
 
-    # Remove foreign key first.
-    op.drop_constraint(
-        "fk_orders_customer_id_customers",
+    with op.batch_alter_table(
         "orders",
-        type_="foreignkey"
-    )
+        schema=None,
+    ) as batch_op:
 
-    # Remove index.
-    op.drop_index(
-        op.f("ix_orders_customer_id"),
-        table_name="orders"
-    )
+        batch_op.drop_constraint(
+            "fk_orders_customer_id_customers",
+            type_="foreignkey",
+        )
 
-    # Remove customer_id column.
-    op.drop_column(
-        "orders",
-        "customer_id"
-    )
+        batch_op.drop_index(
+            batch_op.f("ix_orders_customer_id")
+        )
+
+        batch_op.drop_column("customer_id")
