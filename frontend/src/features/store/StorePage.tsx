@@ -1,401 +1,62 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useState } from "react";
 
-import {
-  checkoutOrder,
-} from "../orders/api/ordersApi";
-
-import type {
-  PaymentMethod,
-} from "../orders/types/order.types";
-
-import {
-  getProducts,
-} from "../products/api/productsApi";
-
-import {
-  getCustomers,
-} from "../customers/api/customersApi";
-
-import type {
-  Customer,
-} from "../customers/types/customer.types";
-
-import type {
-  Product,
-} from "@/types/product";
-
-import {
-  formatPeso,
-} from "@/utils/formatters";
-
-
-type CartItem = {
-  product: Product;
-  quantity: number;
-};
-
-
-async function fetchStoreData() {
-  const [
-    productData,
-    customerData,
-  ] = await Promise.all([
-    getProducts(),
-    getCustomers(),
-  ]);
-
-  return {
-    products:
-      productData.filter(
-        (product) =>
-          product.is_active
-      ),
-
-    customers:
-      customerData.filter(
-        (customer) =>
-          customer.is_active
-      ),
-  };
-}
-
+import { checkoutOrder } from "../orders/api/ordersApi";
+import type { PaymentMethod } from "../orders/types/order.types";
+import { useCart } from "@/shared/hooks/useCart";
+import { useLiveProducts } from "@/shared/hooks/useLiveProducts";
+import type { Product } from "@/types/product";
+import { formatPeso } from "@/utils/formatters";
 
 function StorePage() {
-  const [
-    products,
-    setProducts,
-  ] = useState<Product[]>([]);
+  // Storefront shows sold-out items too, greyed out, so shoppers can see
+  // the full menu. Stock is polled, so a POS sale updates this page.
+  const { products, customers, loading, error, refresh } = useLiveProducts({
+    withCustomers: true,
+  });
 
-  const [
-    customers,
-    setCustomers,
-  ] = useState<Customer[]>([]);
+  const cart = useCart(products);
 
-  const [
-    cart,
-    setCart,
-  ] = useState<Record<number, number>>(
-    {}
-  );
-
-  const [
-    loading,
-    setLoading,
-  ] = useState(true);
-
-  const [
-    error,
-    setError,
-  ] = useState<string | null>(
+  const [showCart, setShowCart] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(
     null
   );
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("gcash");
 
-  const [
-    showCart,
-    setShowCart,
-  ] = useState(false);
+  // The markup below still uses these names, so they stay as thin aliases
+  // over the shared cart rather than a rewrite of the whole page.
+  const cartItems = cart.items;
+  const totalCartItems = cart.count;
+  const cartTotal = cart.subtotal;
+  const decreaseQuantity = cart.decrease;
+  const removeFromCart = cart.remove;
 
-  const [
-    checkingOut,
-    setCheckingOut,
-  ] = useState(false);
-
-  const [
-    checkoutError,
-    setCheckoutError,
-  ] = useState<string | null>(
-    null
-  );
-
-  const [
-    successMessage,
-    setSuccessMessage,
-  ] = useState<string | null>(
-    null
-  );
-
-  const [
-    selectedCustomerId,
-    setSelectedCustomerId,
-  ] = useState<number | null>(
-    null
-  );
-
-  const [
-    paymentMethod,
-    setPaymentMethod,
-  ] = useState<PaymentMethod>(
-    "gcash"
-  );
-
-
-  /* =========================
-     INITIAL STORE LOAD
-  ========================= */
-
-  useEffect(() => {
-    let cancelled = false;
-
-
-    fetchStoreData()
-      .then((data) => {
-        if (cancelled) {
-          return;
-        }
-
-        setProducts(
-          data.products
-        );
-
-        setCustomers(
-          data.customers
-        );
-      })
-      .catch((err) => {
-        if (cancelled) {
-          return;
-        }
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load the online store."
-        );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-
-  /* =========================
-     REFRESH STORE DATA
-  ========================= */
-
-  async function refreshStoreData() {
-    try {
-      const data =
-        await fetchStoreData();
-
-      setProducts(
-        data.products
-      );
-
-      setCustomers(
-        data.customers
-      );
-
-      setError(null);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to refresh the online store."
-      );
-    }
-  }
-
-
-  /* =========================
-     CART DATA
-  ========================= */
-
-  const cartItems =
-    useMemo<CartItem[]>(() => {
-      return products
-        .filter(
-          (product) =>
-            (
-              cart[product.id] || 0
-            ) > 0
-        )
-        .map(
-          (product) => ({
-            product,
-            quantity:
-              cart[product.id] || 0,
-          })
-        );
-    }, [
-      products,
-      cart,
-    ]);
-
-
-  const totalCartItems =
-    useMemo(() => {
-      return cartItems.reduce(
-        (total, item) =>
-          total +
-          item.quantity,
-        0
-      );
-    }, [cartItems]);
-
-
-  const cartTotal =
-    useMemo(() => {
-      return cartItems.reduce(
-        (total, item) =>
-          total +
-          (
-            item.product.price *
-            item.quantity
-          ),
-        0
-      );
-    }, [cartItems]);
-
-
-  /* =========================
-     ADD TO CART
-  ========================= */
-
-  function addToCart(
-    product: Product
-  ) {
+  function addToCart(product: Product) {
     setSuccessMessage(null);
-
-    setCart(
-      (currentCart) => {
-        const currentQuantity =
-          currentCart[
-            product.id
-          ] || 0;
-
-        if (
-          currentQuantity >=
-          product.stock
-        ) {
-          return currentCart;
-        }
-
-        return {
-          ...currentCart,
-
-          [product.id]:
-            currentQuantity + 1,
-        };
-      }
-    );
+    cart.add(product);
   }
 
-
-  /* =========================
-     INCREASE QUANTITY
-  ========================= */
-
-  function increaseQuantity(
-    product: Product
-  ) {
-    setCart(
-      (currentCart) => {
-        const currentQuantity =
-          currentCart[
-            product.id
-          ] || 0;
-
-        if (
-          currentQuantity >=
-          product.stock
-        ) {
-          return currentCart;
-        }
-
-        return {
-          ...currentCart,
-
-          [product.id]:
-            currentQuantity + 1,
-        };
-      }
-    );
+  function increaseQuantity(product: Product) {
+    cart.increase(product.id);
   }
-
-
-  /* =========================
-     DECREASE QUANTITY
-  ========================= */
-
-  function decreaseQuantity(
-    productId: number
-  ) {
-    setCart(
-      (currentCart) => {
-        const currentQuantity =
-          currentCart[
-            productId
-          ] || 0;
-
-        if (
-          currentQuantity <= 1
-        ) {
-          const updatedCart = {
-            ...currentCart,
-          };
-
-          delete updatedCart[
-            productId
-          ];
-
-          return updatedCart;
-        }
-
-        return {
-          ...currentCart,
-
-          [productId]:
-            currentQuantity - 1,
-        };
-      }
-    );
-  }
-
-
-  /* =========================
-     REMOVE FROM CART
-  ========================= */
-
-  function removeFromCart(
-    productId: number
-  ) {
-    setCart(
-      (currentCart) => {
-        const updatedCart = {
-          ...currentCart,
-        };
-
-        delete updatedCart[
-          productId
-        ];
-
-        return updatedCart;
-      }
-    );
-  }
-
-
-  /* =========================
-     ONLINE CHECKOUT
-  ========================= */
 
   async function handleCheckout() {
-    if (
-      cartItems.length === 0
-    ) {
+    if (cart.isEmpty) {
+      setCheckoutError("Your cart is empty.");
+      return;
+    }
+
+    // Stock can move between opening the cart and paying for it. Say so
+    // plainly instead of letting the server reject the order.
+    if (cart.hasConflicts) {
+      const [conflict] = cart.conflicts;
+
       setCheckoutError(
-        "Your cart is empty."
+        conflict.available > 0
+          ? `Only ${conflict.available} left of ${conflict.productName}. Adjust your cart to continue.`
+          : `${conflict.productName} just sold out. Remove it to continue.`
       );
 
       return;
@@ -405,71 +66,36 @@ function StorePage() {
     setCheckoutError(null);
     setSuccessMessage(null);
 
-
     try {
-      const order =
-        await checkoutOrder(
-          paymentMethod,
-
-          cartItems.map(
-            (item) => ({
-              product_id:
-                item.product.id,
-
-              quantity:
-                item.quantity,
-            })
-          ),
-
-          selectedCustomerId,
-
-          "ONLINE"
-        );
-
-
-      const selectedCustomer =
-        customers.find(
-          (customer) =>
-            customer.id ===
-            selectedCustomerId
-        );
-
+      const order = await checkoutOrder(
+        paymentMethod,
+        cart.checkoutItems,
+        selectedCustomerId,
+        "ONLINE"
+      );
 
       const customerLabel =
-        selectedCustomer?.name ??
-        "Guest Customer";
-
+        customers.find((customer) => customer.id === selectedCustomerId)
+          ?.name ?? "Guest Customer";
 
       setSuccessMessage(
         `Online order #${order.id} placed successfully for ${customerLabel}.`
       );
 
-
-      setCart({});
-
-      setSelectedCustomerId(
-        null
-      );
-
-      setPaymentMethod(
-        "gcash"
-      );
-
+      cart.clear();
+      setSelectedCustomerId(null);
+      setPaymentMethod("gcash");
       setShowCart(false);
 
-
-      await refreshStoreData();
-    } catch (err) {
+      await refresh();
+    } catch (caught) {
       setCheckoutError(
-        err instanceof Error
-          ? err.message
-          : "Online checkout failed."
+        caught instanceof Error ? caught.message : "Online checkout failed."
       );
     } finally {
       setCheckingOut(false);
     }
   }
-
 
   /* =========================
      LOADING
@@ -602,9 +228,7 @@ function StorePage() {
             {products.map(
               (product) => {
                 const quantityInCart =
-                  cart[
-                    product.id
-                  ] || 0;
+                  cart.quantityOf(product.id);
 
                 const outOfStock =
                   product.stock <= 0;
