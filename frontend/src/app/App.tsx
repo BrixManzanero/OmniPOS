@@ -36,6 +36,14 @@ const AnalyticsPage = lazy(
 );
 
 
+const InsightsPage = lazy(
+  () =>
+    import(
+      "@/features/insights/InsightsPage"
+    )
+);
+
+
 const POSPage = lazy(
   () =>
     import(
@@ -48,6 +56,14 @@ const ProductsPage = lazy(
   () =>
     import(
       "@/features/products/ProductsPage"
+    )
+);
+
+
+const PromotionsPage = lazy(
+  () =>
+    import(
+      "@/features/promotions/PromotionsPage"
     )
 );
 
@@ -167,9 +183,25 @@ function App() {
 
 
           <Route
+            path="/promotions"
+            element={
+              <PromotionsPage />
+            }
+          />
+
+
+          <Route
             path="/analytics"
             element={
               <AnalyticsPage />
+            }
+          />
+
+
+          <Route
+            path="/insights"
+            element={
+              <InsightsPage />
             }
           />
 

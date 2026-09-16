@@ -6,9 +6,11 @@ from .routers import (
     analytics,
     customers,
     dashboard,
+    insights,
     inventory,
     orders,
     products,
+    promotions,
 )
 
 
@@ -32,6 +34,8 @@ app.include_router(dashboard.router)
 app.include_router(analytics.router)
 app.include_router(inventory.router)
 app.include_router(customers.router)
+app.include_router(promotions.router)
+app.include_router(insights.router)
 
 
 @app.get("/")
