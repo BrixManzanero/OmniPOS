@@ -256,3 +256,110 @@ class Customer(Base):
         "Order",
         back_populates="customer"
     )
+
+# =========================
+# PROMOTIONS
+# =========================
+
+class Promotion(Base):
+    __tablename__ = "promotions"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    name = Column(
+        String,
+        nullable=False
+    )
+
+    description = Column(
+        String,
+        nullable=True
+    )
+
+    # PERCENT = percentage off
+    # FIXED   = fixed peso amount off
+    discount_type = Column(
+        String,
+        nullable=False,
+        default="PERCENT"
+    )
+
+    discount_value = Column(
+        Float,
+        nullable=False
+    )
+
+    # ALL | PRODUCT | CATEGORY
+    target_type = Column(
+        String,
+        nullable=False,
+        default="ALL"
+    )
+
+    target_product_id = Column(
+        Integer,
+        ForeignKey("products.id"),
+        nullable=True,
+        index=True
+    )
+
+    target_category = Column(
+        String,
+        nullable=True
+    )
+
+    # ALL | POS | ONLINE
+    channel = Column(
+        String,
+        nullable=False,
+        default="ALL"
+    )
+
+    start_date = Column(
+        DateTime,
+        nullable=True
+    )
+
+    end_date = Column(
+        DateTime,
+        nullable=True
+    )
+
+    # Optional daily time window (0-23).
+    # Used by AI weak-hour recommendations.
+    start_hour = Column(
+        Integer,
+        nullable=True
+    )
+
+    end_hour = Column(
+        Integer,
+        nullable=True
+    )
+
+    # DRAFT | ACTIVE | PAUSED | EXPIRED
+    status = Column(
+        String,
+        nullable=False,
+        default="DRAFT"
+    )
+
+    # MANUAL | AI
+    source = Column(
+        String,
+        nullable=False,
+        default="MANUAL"
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+    target_product = relationship(
+        "Product"
+    )

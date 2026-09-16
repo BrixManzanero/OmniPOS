@@ -98,29 +98,40 @@ function AppLayout() {
           </NavLink>
 
 
-          <div className="nav-disabled">
-            <span>Promotions</span>
-            <small>Soon</small>
-          </div>
+          <NavLink
+            to="/promotions"
+            className={({ isActive }) =>
+              isActive
+                ? "nav-item active"
+                : "nav-item"
+            }
+          >
+            Promotions
+          </NavLink>
 
 
-            <NavLink
+          <NavLink
+            to="/analytics"
+            className={({ isActive }) =>
+              isActive
+                ? "nav-item active"
+                : "nav-item"
+            }
+          >
+            Analytics
+          </NavLink>
 
-              to="/analytics"
-              className={({ isActive }) =>
-                isActive
-                  ? "nav-item active"
-                  : "nav-item"
-              }
-            >
-              Analytics
-            </NavLink>
-          
 
-          <div className="nav-disabled">
-            <span>AI Insights</span>
-            <small>Soon</small>
-          </div>
+          <NavLink
+            to="/insights"
+            className={({ isActive }) =>
+              isActive
+                ? "nav-item active"
+                : "nav-item"
+            }
+          >
+            AI Insights
+          </NavLink>
 
         </nav>
 

@@ -192,3 +192,127 @@ class CustomerHistoryResponse(BaseModel):
     summary: CustomerHistorySummary
 
     orders: list[OrderResponse]
+
+# =========================
+# PROMOTIONS
+# =========================
+
+DiscountType = Literal["PERCENT", "FIXED"]
+
+TargetType = Literal["ALL", "PRODUCT", "CATEGORY"]
+
+PromotionChannel = Literal["ALL", "POS", "ONLINE"]
+
+PromotionSource = Literal["MANUAL", "AI"]
+
+PromotionStatus = Literal[
+    "DRAFT",
+    "ACTIVE",
+    "PAUSED",
+    "EXPIRED",
+]
+
+
+class PromotionCreate(BaseModel):
+    name: str
+    description: str | None = None
+
+    discount_type: DiscountType = "PERCENT"
+    discount_value: float = Field(gt=0)
+
+    target_type: TargetType = "ALL"
+    target_product_id: int | None = None
+    target_category: str | None = None
+
+    channel: PromotionChannel = "ALL"
+
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+
+    start_hour: int | None = Field(
+        default=None,
+        ge=0,
+        le=23,
+    )
+
+    end_hour: int | None = Field(
+        default=None,
+        ge=0,
+        le=23,
+    )
+
+    status: PromotionStatus = "DRAFT"
+    source: PromotionSource = "MANUAL"
+
+
+class PromotionResponse(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+
+    discount_type: str
+    discount_value: float
+
+    target_type: str
+    target_product_id: int | None = None
+    target_product_name: str | None = None
+    target_category: str | None = None
+
+    channel: str
+
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    start_hour: int | None = None
+    end_hour: int | None = None
+
+    status: str
+    source: str
+    created_at: datetime
+
+    # Computed: running ba talaga ngayon?
+    is_live: bool
+
+    model_config = {
+        "from_attributes": True
+    }
+
+
+class PromotionStatusUpdate(BaseModel):
+    status: PromotionStatus
+
+
+# =========================
+# AI INSIGHTS
+# =========================
+
+InsightSeverity = Literal[
+    "opportunity",
+    "warning",
+    "info",
+]
+
+
+class InsightMetric(BaseModel):
+    label: str
+    value: str
+
+
+class InsightResponse(BaseModel):
+    id: str
+    title: str
+    summary: str
+    severity: InsightSeverity
+
+    metrics: list[InsightMetric] = []
+
+    # Ready-to-approve promotion draft.
+    # NULL means the insight is informational only.
+    suggested_promotion: PromotionCreate | None = None
+
+
+class InsightsResponse(BaseModel):
+    generated_at: datetime
+    period_days: int
+    orders_analyzed: int
+
+    insights: list[InsightResponse]

@@ -33,5 +33,11 @@ export async function apiRequest<T>(
     );
   }
 
+  // 204 No Content has an empty body,
+  // so response.json() would throw.
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json();
 }
